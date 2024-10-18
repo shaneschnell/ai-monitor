@@ -79,7 +79,7 @@ def get_cpu_average():
     return result
 
 def get_gpu_info():
-    command = "nvidia-smi --query-gpu=gpu_name,memory.used,utilization.gpu,memory.total --format=csv,noheader,nounits"
+    command = "nvidia-smi --query-gpu=gpu_name,memory.used,utilization.gpu,memory.total,power.draw --format=csv,noheader,nounits"
     try:
         result = subprocess.check_output(command, shell=True).decode().strip()
     except subprocess.CalledProcessError:
@@ -87,11 +87,11 @@ def get_gpu_info():
     
     gpu_info = []
     for line in result.split('\n'):
-        gpu_name, memory_used, gpu_utilization, gpu_memory = line.split(", ")
+        gpu_name, memory_used, gpu_utilization, gpu_memory, power_output = line.split(", ")
         memory_used = int(memory_used) / 1024
         gpu_memory = int(gpu_memory) / 1024
         gpu_utilization = int(gpu_utilization)
-        gpu_info.append((gpu_name, memory_used, gpu_utilization, gpu_memory))
+        gpu_info.append((gpu_name, memory_used, gpu_utilization, gpu_memory, power_output))
     
     return gpu_info
 
@@ -135,9 +135,10 @@ def main(stdscr, api_url):
     COMPONENT_WIDTH = 4 
     UTILIZATION_WIDTH = 6
     MEMORY_WIDTH = 20
+    POWER_WIDTH = 6
 
     # Fixed width strings for consistent alignment
-    COMPONENT_FORMAT = f" {{:<{COMPONENT_WIDTH}}}  {{:<{UTILIZATION_WIDTH}}}  {{:<{MEMORY_WIDTH}}}"
+    COMPONENT_FORMAT = f" {{:<{COMPONENT_WIDTH}}}  {{:<{UTILIZATION_WIDTH}}}  {{:<{MEMORY_WIDTH}}} {{:<{POWER_WIDTH}}}"
     NIC_FORMAT = f" {{:<{COMPONENT_WIDTH}}} {{:<{MEMORY_WIDTH}}} {{:<{MEMORY_WIDTH}}}"
 
     stdscr.addstr(0, 0, f"Cisco {server_type} computing node (hostname: {hostname})")
@@ -147,7 +148,7 @@ def main(stdscr, api_url):
     else:
         stdscr.addstr(3, 0, "No GPU detected")
 
-    stdscr.addstr(5, 0, COMPONENT_FORMAT.format("", "Use", "Memory Use"))
+    stdscr.addstr(5, 0, COMPONENT_FORMAT.format("", "Use", "Memory Use", "Power"))
 
     interval = 1  # Adjust the interval as needed
 
@@ -159,12 +160,12 @@ def main(stdscr, api_url):
             total_memory, used_memory, available_memory = get_memory_info()
 
             # Print CPU metrics
-            stdscr.addstr(7, 0, COMPONENT_FORMAT.format("CPU", f"{cpu_average:.2f}%", f"{used_memory}/{total_memory}"))
+            stdscr.addstr(7, 0, COMPONENT_FORMAT.format("CPU", f"{cpu_average:.2f}%", f"{used_memory}/{total_memory}", "N/A"))
 
             # Print GPU metrics
             row_offset = 9 
-            for i, (gpu_name, memory_used, gpu_utilization, gpu_memory) in enumerate(get_gpu_info()):
-                stdscr.addstr(row_offset + i, 0, COMPONENT_FORMAT.format(f"GPU{i+1}", f"{gpu_utilization}%", f"{memory_used:.1f}/{gpu_memory:.1f}Gi"))
+            for i, (gpu_name, memory_used, gpu_utilization, gpu_memory, power_output) in enumerate(get_gpu_info()):
+                stdscr.addstr(row_offset + i, 0, COMPONENT_FORMAT.format(f"GPU{i+1}", f"{gpu_utilization}%", f"{memory_used:.1f}/{gpu_memory:.1f}Gi", f"{power_output}W"))
 
             # Print NIC metrics
             row_offset += num_gpus + 1
