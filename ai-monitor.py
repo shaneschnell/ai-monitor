@@ -120,18 +120,18 @@ def get_cpu_average():
     return result
 
 def get_gpu_info():
-    command = "nvidia-smi --query-gpu=gpu_name,memory.used,utilization.gpu,memory.total --format=csv,noheader,nounits"
+    command = "nvidia-smi --query-gpu=gpu_name,memory.used,utilization.gpu,memory.total,power.draw --format=csv,noheader,nounits"
     try:
         result = subprocess.check_output(command, shell=True).decode().strip()
     except subprocess.CalledProcessError:
         return 'None', 0.0, 0.0, 0.0
     else:
-        gpu_name, memory_used, gpu_utilization, gpu_memory = result.split(", ")
+        gpu_name, memory_used, gpu_utilization, gpu_memory, power_output = result.split(", ")
         memory_used = int(memory_used)
         gpu_memory = int(gpu_memory)
         gpu_memory_gib = round(gpu_memory / 1024, 2)
         memory_used = round(memory_used / 1024, 2)
-        return gpu_name, memory_used, gpu_utilization, gpu_memory_gib
+        return gpu_name, memory_used, gpu_utilization, gpu_memory_gib, power_output
 
 def get_memory_info():
     command = "free -h | awk '/^Mem:/ {print $2, $3, $4}'"
@@ -146,12 +146,12 @@ def main():
         cpu_sockets = get_cpu_sockets()
         cpu_cores = get_cpu_cores()
         cpu_type = get_cpu_type()
-        gpu_name, memory_used, gpu_utilization, gpu_memory_gib = get_gpu_info()
+        gpu_name, memory_used, gpu_utilization, gpu_memory_gib, power_output = get_gpu_info()
         
         print(f"\nCisco {server_type} computing node with X440p PCIE node X-Fabric Enabled")
         print(f"\nCPU Type: {cpu_sockets} x {cpu_type} with {cpu_cores} cores each")
         print(f"GPU Type: {gpu_name}\n")
-        print(f"\nCPU util   CPU mem used/total\tGPU mem used/total   GPU util   Network tx/rx util")
+        print(f"\nCPU util   CPU mem used/total\tGPU mem used/total   GPU util   GPU pwr   Network tx/rx util")
         
         interval = 1  # Adjust the interval as needed
         while True:
@@ -159,11 +159,13 @@ def main():
             network_stats = refresh_window(interval, *args)
             cpu_average = float(get_cpu_average())
             cpu_average = f"{cpu_average:<7.2f}"
-            gpu_name, memory_used, gpu_utilization, gpu_memory_gib = get_gpu_info()
+            gpu_name, memory_used, gpu_utilization, gpu_memory_gib, power_output = get_gpu_info()
             memory_used = float(memory_used)
             memory_used = f"{memory_used:2.2f}"
             gpu_memory_gib = int(gpu_memory_gib)
             gpu_memory_gib = f"{gpu_memory_gib:2}"
+            power_output = float(power_output)
+            power_output = f"{power_output:2.2f}"
             gpu_utilization = int(gpu_utilization)
             gpu_utilization = f"{gpu_utilization:<7}"
 
@@ -171,7 +173,7 @@ def main():
             
             # Print all metrics together
             for name, (sent_speed_human, recv_speed_human) in network_stats.items():
-                print(f"{cpu_average}%   {used_memory}/{total_memory}\t\t{memory_used}Gi/{gpu_memory_gib}Gi          {gpu_utilization}%   {sent_speed_human}/{recv_speed_human}   ", end="\r", flush=True)
+                print(f"{cpu_average}%   {used_memory}/{total_memory}\t\t{memory_used}Gi/{gpu_memory_gib}Gi          {gpu_utilization}%   {power_output}W   {sent_speed_human}/{recv_speed_human}   ", end="\r", flush=True)
             
             time.sleep(1)
     except (KeyboardInterrupt, SystemExit):
